@@ -1,45 +1,71 @@
 import threading
-from random import randint
-from time import sleep
+import random
+import time
+
+class CustomLock:
+    def __init__(self):
+        self.locked = False
+    
+    def acquire(self):
+        while self.locked:
+            pass
+        self.locked = True
+    
+    def release(self):
+        self.locked = False
 
 class Bank:
     def __init__(self):
         self.balance = 0
-        self.lock = threading.Lock()
-
+        self.lock = CustomLock()
+        self.deposit_count = 0
+        self.take_count = 0
+    
     def deposit(self):
-        for _ in range(100):
-            amount = randint(50, 500)
-            with self.lock:
-                if self.balance + amount >= 500 and not self.lock.locked():
-                    self.lock.release()
-                self.balance += amount
-                print(f'Пополнение: {amount}. Баланс: {self.balance}')
-            sleep(0.001)
-
+        for _ in range(100):  
+            amount = random.randint(50, 500)
+            self.lock.acquire()
+            self.balance += amount
+            print(f"Пополнение: {amount}. Баланс: {self.balance}")
+            self.lock.release()
+            
+            if self.balance >= 500:
+                print("Баланс достиг 500 или больше, можно продолжать операции.")
+            
+            time.sleep(0.001)
+            self.deposit_count += 1
+    
     def take(self):
-        for _ in range(100):
-            amount = randint(50, 500)
-            print(f'Запрос на {amount}')
-            with self.lock:
-                if amount <= self.balance:
-                    self.balance -= amount
-                    print(f'Снятие: {amount}. Баланс: {self.balance}')
-                else:
-                    print("Запрос отклонён, недостаточно средств")
-                    self.lock.acquire()
-                    break
+        for _ in range(100):  
+            request_amount = random.randint(50, 500)
+            print(f"Запрос на {request_amount}")
+            time.sleep(0.001)
+            
+            if request_amount <= self.balance:
+                self.lock.acquire()
+                self.balance -= request_amount
+                print(f"Снятие: {request_amount}. Баланс: {self.balance}")
+                self.lock.release()
+            else:
+                print("Запрос отклонён, недостаточно средств")
+                self.lock.acquire()
+                self.lock.release()
+            
+            self.take_count += 1
+    
+    def start(self):
+        th1 = threading.Thread(target=self.deposit)
+        th2 = threading.Thread(target=self.take)
+        
+        th1.start()
+        th2.start()
+        
+        th1.join()
+        th2.join()
+        
+        print(f'Итоговый баланс: {self.balance}')
+        print(f'Количество транзакций пополнения: {self.deposit_count}')
+        print(f'Количество транзакций снятия: {self.take_count}')
 
-if __name__ == "__main__":
-    bk = Bank()
-
-    th1 = threading.Thread(target=Bank.deposit, args=(bk,), name="DepositThread")
-    th2 = threading.Thread(target=Bank.take, args=(bk,), name="TakeThread")
-
-    th1.start()
-    th2.start()
-
-    th1.join()
-    th2.join()
-
-    print(f'Итоговый баланс: {bk.balance}')
+bank = Bank()
+bank.start()
